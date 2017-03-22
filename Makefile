@@ -1,0 +1,1 @@
+clang++ main.cc resample.cc util.cc wavwriter.cc libkissfft.a -std=c++11

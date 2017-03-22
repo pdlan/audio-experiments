@@ -2,6 +2,23 @@
 #include <iostream>
 #include "resample.h"
 
+void resample_simple(const double* in, double* out, double ratio,
+                     size_t in_length, size_t out_length) {
+    for (size_t i = 0; i < out_length; ++i) {
+        double position = i / ratio;
+        size_t c = ceil(position);
+        size_t f = floor(position);
+        if (c >= in_length) {
+            return;
+        }
+        if (c == f) {
+            out[i] = in[c];
+        } else {
+            out[i] = 0;
+        }
+    }
+}
+
 void resample_linear(const double* in, double* out, double ratio,
                      size_t in_length, size_t out_length) {
     for (size_t i = 0; i < out_length; ++i) {
