@@ -20,8 +20,8 @@ int main(int argc, const char **argv) {
     double *data = nullptr;
     size_t length = load_wav(filename, mdata);
     size_t new_length;
-    double ratio = 0.8;
-    RectWindow window(4096);
+    double ratio = 1.50;
+    HannWindow window(4096);
     for (size_t i = 0; i < mdata.size(); ++i) {
         double *old_data = mdata[i];
         double *new_data = nullptr;

@@ -28,12 +28,17 @@ class RectWindow : public WindowFunction {
 
 class HannWindow : public WindowFunction {
     public:
-        HannWindow(size_t size) : _size(size) {}
+        HannWindow(size_t size) : _size(size) {
+            for (size_t i = 0; i < size; ++i) {
+                value.push_back(0.5 * (1 - cos(2 * Pi * i / (_size - 1))));
+            }
+        }
         size_t size() const {return this->_size;}
         double window(size_t x) const {
-            return 0.5 * (1 - cos(2 * Pi * x / (_size - 1)));
+            return value[x];
         }
     private:
         size_t _size;
+        std::vector<double> value;
 };
 #endif
