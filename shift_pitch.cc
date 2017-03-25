@@ -6,59 +6,55 @@
 #include <vector>
 #include <deque>
 #include <algorithm>
-#include "kissfft.hh"
+#include <fftw3.h>
 #include "shift_pitch.h"
 #include "resample.h"
 #include "util.h"
 
 size_t shift_pitch_one(const double *in, double **out, double ratio,
-                       const WindowFunction &window, size_t length,
-                       const kissfft<double> &fft,
-                       const kissfft<double> &ifft) {
-    typedef std::complex<double> ComplexType;
+                       const WindowFunction &window, size_t length) {
     size_t window_size = window.size();
     *out = new double[window_size];
     double *window_data = new double[window_size];
+    fftw_complex *fd = new fftw_complex[window_size];
     for (size_t i = 0;
          i < ((length < window_size) ? length : window_size);
          ++i) {
         window_data[i] = in[i] * window.window(i);
     }
-    ComplexType *window_data_complex = new ComplexType[window_size];
-    ComplexType *fd = new ComplexType[window_size];
-    ComplexType *inversed = new ComplexType[window_size];
-    for (size_t i = 0; i < window_size; ++i) {
-        window_data_complex[i].real(window_data[i]);
-        window_data_complex[i].imag(0);
+    fftw_plan plan = fftw_plan_dft_r2c_1d(window_size, window_data, fd, FFTW_ESTIMATE);
+    fftw_execute(plan);
+    fftw_destroy_plan(plan);
+    size_t fd_length = window_size / 2 + 1;
+    double *fd_real_unproc = new double[fd_length];
+    double *fd_imag_unproc = new double[fd_length];
+    double *fd_real_proc = new double[fd_length];
+    double *fd_imag_proc = new double[fd_length];
+    for (size_t i = 0; i < window_size / 2 + 1; ++i) {
+        if (ratio >= 1 || i < window_size / 8) {
+            fd_real_unproc[i] = fd[i][0];
+            fd_imag_unproc[i] = fd[i][1];
+        }
     }
-    fft.transform(window_data_complex, fd);
-    double *fd_real_unproc = new double[window_size];
-    double *fd_imag_unproc = new double[window_size];
-    double *fd_real_proc = new double[window_size];
-    double *fd_imag_proc = new double[window_size];
-    for (size_t i = 0; i < window_size; ++i) {
-        fd_real_unproc[i] = fd[i].real();
-        fd_imag_unproc[i] = fd[i].imag();
+    size_t new_length = ratio < 1 ? fd_length * ratio : fd_length;
+    resample_linear(fd_real_unproc, fd_real_proc, ratio, fd_length, new_length);
+    resample_linear(fd_imag_unproc, fd_imag_proc, ratio, fd_length, new_length);
+    for (size_t i = 0; i < window_size / 2 + 1; ++i) {
+        fd[i][0] = fd_real_proc[i];
+        fd[i][1] = fd_imag_proc[i];
     }
-    size_t new_length = ratio < 1 ? window_size * ratio : window_size;
-    resample_linear(fd_real_unproc, fd_real_proc, ratio, window_size, new_length);
-    resample_linear(fd_imag_unproc, fd_imag_proc, ratio, window_size, new_length);
+    fftw_plan plan_i = fftw_plan_dft_c2r_1d(window_size, fd, window_data, FFTW_ESTIMATE);
+    fftw_execute(plan_i);
+    fftw_destroy_plan(plan_i);
     for (size_t i = 0; i < window_size; ++i) {
-        fd[i].real(fd_real_proc[i]);
-        fd[i].imag(fd_imag_proc[i]);
+        (*out)[i] = window_data[i] / window_size;
     }
-    ifft.transform(fd, inversed);
-    for (size_t i = 0; i < window_size; ++i) {
-        (*out)[i] = inversed[i].real() / window_size;
-    }
-    delete window_data_complex;
-    delete inversed;
-    delete fd;
+    delete window_data;
+    delete[] fd;
     delete fd_real_unproc;
     delete fd_imag_unproc;
     delete fd_real_proc;
     delete fd_imag_proc;
-    delete window_data;
     return window_size;
 }
 
@@ -68,14 +64,9 @@ size_t shift_pitch(const double *in, double **out, double ratio,
     const int OverlapNumber = 2;
     deque<double *> data;
     size_t window_size = window.size();
-    kissfft<double> fft(window_size, false);
-    kissfft<double> ifft(window_size, true);
     size_t chunk_size = window_size / OverlapNumber;
     if (window_size / chunk_size == 0) {
-        return shift_pitch_one(in, out, ratio, window, length, fft, ifft);
-    } else if (window_size / chunk_size == 1) {
-        *out = nullptr;
-        return 0;
+        return shift_pitch_one(in, out, ratio, window, length);
     }
     size_t window_number = ceil(length / double(chunk_size));
     size_t new_length = window_number * chunk_size;
@@ -85,10 +76,10 @@ size_t shift_pitch(const double *in, double **out, double ratio,
         if ((window_number - i) <= OverlapNumber) {
             size_t length_left = length - i * chunk_size;
             shift_pitch_one(in + i * chunk_size, &proceeded, ratio, window,
-                            length_left, fft, ifft);
+                            length_left);
         } else {
             shift_pitch_one(in + i * chunk_size, &proceeded, ratio, window,
-                            window_size, fft, ifft);
+                            window_size);
         }
         if (data.size() < OverlapNumber) {
             data.push_back(proceeded);
