@@ -3,5 +3,7 @@
 #include "util.h"
 
 size_t shift_pitch(const double *in, double **out, double ratio,
+                   const RectWindow &window, size_t length);
+size_t shift_pitch(const double *in, double **out, double ratio,
                    const WindowFunction &window, size_t length);
 #endif

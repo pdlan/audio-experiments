@@ -4,14 +4,14 @@
 #include "dr_wav.h"
 #include "util.h"
 
-size_t load_wav(const std::string &filename, MultiChannelData &data) {
+WavInfo load_wav(const std::string &filename, MultiChannelData &data) {
     using namespace std;
     drwav *wav = drwav_open_file(filename.c_str());
     if (!wav) {
-        return 0;
+        return {0, 0, 0, 0, 0};
     }
     data.clear();
-    unsigned int channels = wav->channels;
+    unsigned short channels = wav->channels;
     size_t length = wav->totalSampleCount;
     size_t real_length = length / channels;
     float *sample_data = new float[length];
@@ -25,7 +25,13 @@ size_t load_wav(const std::string &filename, MultiChannelData &data) {
     }
     delete sample_data;
     drwav_close(wav);
-    return real_length;
+    return {
+        length,
+        wav->sampleRate,
+        channels,
+        wav->bitsPerSample,
+        wav->bytesPerSample
+    };
 }
 
 size_t join_channels(const MultiChannelData &in, double **out, size_t length) {

@@ -25,11 +25,10 @@ struct DataChunkHeader {
     uint32_t size;
 };
 
-void write_wav(const std::string &filename,
-               unsigned int channels, unsigned int samples_per_second,
-               double *data, size_t length) {
+void write_wav(const std::string &filename, const WavInfo &info, double *data) {
     using namespace std;
-    size_t file_length = length * 2 + sizeof(RIFFHeader) + sizeof(FormatChunk) + 8;
+    size_t length = info.length;
+    size_t file_length = length * info.bytes_per_sample + sizeof(RIFFHeader) + sizeof(FormatChunk) + 8;
     RIFFHeader riff_header = {
         {'R', 'I', 'F', 'F'},
         (uint32_t)(file_length - 8),
@@ -38,26 +37,45 @@ void write_wav(const std::string &filename,
     FormatChunk format_chunk = {
         {'f', 'm', 't', ' '},
         16,
-        0x0001,
-        (uint16_t)channels,
-        samples_per_second,
-        samples_per_second * channels * 2,
-        2,
-        16
+        (unsigned short)(info.bits_per_sample != 32 ? 0x001 : 0x003),
+        (uint16_t)info.channels,
+        info.sample_rate,
+        info.sample_rate * info.channels * info.bytes_per_sample,
+        info.bytes_per_sample,
+        info.bits_per_sample
     };
     DataChunkHeader data_chunk_header = {
         {'d', 'a', 't', 'a'},
-        (uint32_t)(length * 2)
+        (uint32_t)(length * info.bytes_per_sample)
     };
-    int16_t *buf = new int16_t[length];
-    for (size_t i = 0; i < length; ++i) {
-        buf[i] = (int16_t)(data[i] * 32768);
-    }
     ofstream of(filename);
     of.write((char *)&riff_header, sizeof(RIFFHeader));
     of.write((char *)&format_chunk, sizeof(FormatChunk));
     of.write((char *)&data_chunk_header, sizeof(DataChunkHeader));
-    of.write((char *)buf, length * sizeof(int16_t));
+    if (info.bits_per_sample == 16) {
+        int16_t *buf = new int16_t[length];
+        for (size_t i = 0; i < length; ++i) {
+            buf[i] = (int16_t)(data[i] * 32768);
+        }
+        of.write((char *)buf, length * sizeof(int16_t));
+        delete buf;
+    } else if (info.bits_per_sample == 32) {
+        float *buf = new float[length];
+        for (size_t i = 0; i < length; ++i) {
+            buf[i] = data[i];
+        }
+        of.write((char *)buf, length * sizeof(float));
+        delete buf;
+    } else if (info.bits_per_sample == 24) {
+        char *buf = new char[length*3];
+        for (size_t i = 0; i < length; ++i) {
+            int32_t v = data[i] * 8388608;
+            buf[i*3] = (v & 0x80000000 >> 8) + (v & 0x7f0000 >> 16);
+            buf[i*3+1] = v & 0xff00 >> 8;
+            buf[i*3+2] = v & 0xff;
+        }
+        of.write(buf, length * 3);
+        delete buf;
+    }
     of.close();
-    delete buf;
 }

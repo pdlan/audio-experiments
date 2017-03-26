@@ -31,7 +31,7 @@ size_t shift_pitch_one(const double *in, double **out, double ratio,
     double *fd_real_proc = new double[fd_length];
     double *fd_imag_proc = new double[fd_length];
     for (size_t i = 0; i < window_size / 2 + 1; ++i) {
-        if (ratio >= 1 || i < window_size / 8) {
+        if (ratio >= 1 || i < window_size) {
             fd_real_unproc[i] = fd[i][0];
             fd_imag_unproc[i] = fd[i][1];
         }
@@ -58,10 +58,12 @@ size_t shift_pitch_one(const double *in, double **out, double ratio,
     return window_size;
 }
 
+
 size_t shift_pitch(const double *in, double **out, double ratio,
-                   const WindowFunction &window, size_t length) {
+                   const RectWindow &window, size_t length) {
     using namespace std;
     const int OverlapNumber = 2;
+    const int ValidChunk = 2;
     deque<double *> data;
     size_t window_size = window.size();
     size_t chunk_size = window_size / OverlapNumber;
@@ -91,11 +93,46 @@ size_t shift_pitch(const double *in, double **out, double ratio,
         }
         for (size_t j = 0; j < chunk_size; ++j) {
             double value = 0.0;
-            for (size_t k = 0; k < data.size(); ++k) {
-                value += data[data.size()-k-1][j+k*chunk_size];
+            if (data.size() < OverlapNumber) {
+                for (size_t k = 0; k < data.size(); ++k) {
+                    value += data[k][j+(data.size()-k-1)*chunk_size];
+                }
+                (*out)[i*chunk_size+j] = value / OverlapNumber;
+            } else {
+                for (size_t k = (OverlapNumber - ValidChunk) / 2;
+                     k < data.size() - (OverlapNumber - ValidChunk) / 2; ++k) {
+                    value += data[k][j+(data.size()-k-1)*chunk_size];
+                }
+                (*out)[i*chunk_size+j] = value / ValidChunk;
             }
-            (*out)[i*chunk_size+j] = value / OverlapNumber;
         }
     }
+    for (deque<double*>::iterator i = data.begin(); i != data.end(); ++i) {
+        delete *i;
+    }
+    return new_length;
+}
+
+
+size_t shift_pitch(const double *in, double **out, double ratio,
+                   const WindowFunction &window, size_t length) {
+    using namespace std;
+    size_t window_size = window.size();
+    size_t chunk_size = window.chunk_size();
+    size_t window_number = ceil(length / double(chunk_size));
+    size_t new_length = (window_number - 1) * chunk_size + window_size;
+    double *data = new double[new_length];
+    copy(in, in + length, data);
+    *out = new double[new_length];
+    for (size_t i = 0; i < window_number; ++i) {
+        double *buffer = nullptr;
+        shift_pitch_one(data + i * chunk_size, &buffer, ratio,
+                        window, window_size);
+        for (size_t j = 0; j < window_size; ++j) {
+            (*out)[i*chunk_size+j] += buffer[j];
+        }
+        delete buffer;
+    }
+    delete data;
     return new_length;
 }
