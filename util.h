@@ -33,7 +33,7 @@ class RectWindow : public WindowFunction {
         }
         size_t size() const {return _size;}
         double window(size_t x) const {return 1.0;}
-        size_t chunk_size() const {return 1;}
+        size_t chunk_size() const {return _chunk_size;}
     private:
         size_t _size;
         size_t _chunk_size;
@@ -62,13 +62,13 @@ class BlackmanWindow : public WindowFunction {
     public:
         BlackmanWindow(size_t size) : _size(size) {
             for (size_t i = 0; i < size; ++i) {
-                const double a0 = 0.42;
-                const double a1 = 0.5;
-                const double a2 = 0.08;
+                const double a0 = 7938.0 / 18608.0;
+                const double a1 = 9240.0 / 18608.0;
+                const double a2 = 1430.0 / 18608.0;
                 value.push_back(a0 - a1 * cos(2 * Pi * i / (_size - 1)) +
                                 a2 * cos(4 * Pi * i / (_size - 1)));
             }
-            _chunk_size = _size * 3 / 4;
+            _chunk_size = _size / 2;
         }
         size_t size() const {return this->_size;}
         double window(size_t x) const {

@@ -12,11 +12,12 @@
 #include "util.h"
 
 size_t shift_pitch_one(const double *in, double **out, double ratio,
-                       const WindowFunction &window, size_t length) {
+                       const WindowFunction &window, size_t length, bool f = false) {
     size_t window_size = window.size();
     *out = new double[window_size];
-    double *window_data = new double[window_size];
-    fftw_complex *fd = new fftw_complex[window_size];
+    double *window_data = new double[window_size] ();
+    size_t fd_length = window_size / 2 + 1;
+    fftw_complex *fd = new fftw_complex[fd_length];
     for (size_t i = 0;
          i < ((length < window_size) ? length : window_size);
          ++i) {
@@ -25,21 +26,18 @@ size_t shift_pitch_one(const double *in, double **out, double ratio,
     fftw_plan plan = fftw_plan_dft_r2c_1d(window_size, window_data, fd, FFTW_ESTIMATE);
     fftw_execute(plan);
     fftw_destroy_plan(plan);
-    size_t fd_length = window_size / 2 + 1;
     double *fd_real_unproc = new double[fd_length];
     double *fd_imag_unproc = new double[fd_length];
-    double *fd_real_proc = new double[fd_length];
-    double *fd_imag_proc = new double[fd_length];
-    for (size_t i = 0; i < window_size / 2 + 1; ++i) {
-        if (ratio >= 1 || i < window_size) {
-            fd_real_unproc[i] = fd[i][0];
-            fd_imag_unproc[i] = fd[i][1];
-        }
+    double *fd_real_proc = new double[fd_length] ();
+    double *fd_imag_proc = new double[fd_length] ();
+    for (size_t i = 0; i < fd_length; ++i) {
+        fd_real_unproc[i] = fd[i][0];
+        fd_imag_unproc[i] = fd[i][1];
     }
-    size_t new_length = ratio < 1 ? fd_length * ratio : fd_length;
+    size_t new_length = ratio < 1 ? round(fd_length * ratio) : fd_length;
     resample_linear(fd_real_unproc, fd_real_proc, ratio, fd_length, new_length);
     resample_linear(fd_imag_unproc, fd_imag_proc, ratio, fd_length, new_length);
-    for (size_t i = 0; i < window_size / 2 + 1; ++i) {
+    for (size_t i = 0; i < fd_length; ++i) {
         fd[i][0] = fd_real_proc[i];
         fd[i][1] = fd_imag_proc[i];
     }
@@ -63,7 +61,6 @@ size_t shift_pitch(const double *in, double **out, double ratio,
                    const RectWindow &window, size_t length) {
     using namespace std;
     const int OverlapNumber = 2;
-    const int ValidChunk = 2;
     deque<double *> data;
     size_t window_size = window.size();
     size_t chunk_size = window_size / OverlapNumber;
@@ -74,40 +71,32 @@ size_t shift_pitch(const double *in, double **out, double ratio,
     size_t new_length = window_number * chunk_size;
     *out = new double[new_length];
     for (size_t i = 0; i < window_number; ++i) {
-        double *proceeded = nullptr;
+        double *processed = nullptr;
         if ((window_number - i) <= OverlapNumber) {
             size_t length_left = length - i * chunk_size;
-            shift_pitch_one(in + i * chunk_size, &proceeded, ratio, window,
+            shift_pitch_one(in + i * chunk_size, &processed, ratio, window,
                             length_left);
         } else {
-            shift_pitch_one(in + i * chunk_size, &proceeded, ratio, window,
-                            window_size);
+            shift_pitch_one(in + i * chunk_size, &processed, ratio, window,
+                            window_size, i == 0);
         }
         if (data.size() < OverlapNumber) {
-            data.push_back(proceeded);
+            data.push_back(processed);
         } else {
             double *first_chunk = data.front();
             delete first_chunk;
             data.pop_front();
-            data.push_back(proceeded);
+            data.push_back(processed);
         }
         for (size_t j = 0; j < chunk_size; ++j) {
             double value = 0.0;
-            if (data.size() < OverlapNumber) {
-                for (size_t k = 0; k < data.size(); ++k) {
-                    value += data[k][j+(data.size()-k-1)*chunk_size];
-                }
-                (*out)[i*chunk_size+j] = value / OverlapNumber;
-            } else {
-                for (size_t k = (OverlapNumber - ValidChunk) / 2;
-                     k < data.size() - (OverlapNumber - ValidChunk) / 2; ++k) {
-                    value += data[k][j+(data.size()-k-1)*chunk_size];
-                }
-                (*out)[i*chunk_size+j] = value / ValidChunk;
+            for (size_t k = 0; k < data.size(); ++k) {
+                value += data[k][j+(data.size()-k-1)*chunk_size];
             }
+            (*out)[i*chunk_size+j] = value / data.size();
         }
     }
-    for (deque<double*>::iterator i = data.begin(); i != data.end(); ++i) {
+    for (deque<double *>::iterator i = data.begin(); i != data.end(); ++i) {
         delete *i;
     }
     return new_length;

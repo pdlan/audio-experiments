@@ -67,15 +67,20 @@ void write_wav(const std::string &filename, const WavInfo &info, double *data) {
         of.write((char *)buf, length * sizeof(float));
         delete buf;
     } else if (info.bits_per_sample == 24) {
+        /*
+        TODO: support for 24bit wav
         char *buf = new char[length*3];
         for (size_t i = 0; i < length; ++i) {
             int32_t v = data[i] * 8388608;
-            buf[i*3] = (v & 0x80000000 >> 8) + (v & 0x7f0000 >> 16);
-            buf[i*3+1] = v & 0xff00 >> 8;
-            buf[i*3+2] = v & 0xff;
+            //printf("%d\n", v);
+            char *v_bytes = (char *)&v;
+            buf[i*3] = (v & 0x80000000 >> 8) || v_bytes[1];
+            buf[i*3+1] = v_bytes[2];
+            buf[i*3+2] = v_bytes[3];
         }
         of.write(buf, length * 3);
         delete buf;
+        */
     }
     of.close();
 }
