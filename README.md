@@ -9,11 +9,16 @@ audio-tool
 变调
 ----
 简单的变调程序。处理方法：对音频分块FFT，伸缩频域后IFFT。升调效果尚可，但降调效果不理想。可使用多种窗函数，但经过多次试验，发现大小为4096矩形窗效果最佳。
+
 使用方法: ./audio-tool shift-pitch in.wav out.wav ratio [window-type=rect] [window-size=4096]
+
 其中ratio是变调比率，大于1为升调，小于1为降调，上升n个半音比率为2^(n/12)。
+
 示例：
 - アイの庭(升调，比率为1.2) [处理前(soundcloud)](https://soundcloud.com/nw68p53359y2/ainoniwa) [处理后(soundcloud)](https://soundcloud.com/nw68p53359y2/ainoniwa-shifted) [处理前(百度盘)](https://pan.baidu.com/s/1i48mpVn) [处理后(百度盘)](https://pan.baidu.com/s/1c1M96E0)
 - 白金(升调，比率为1.2) [处理前(百度盘)](https://pan.baidu.com/s/1nuNDprV) [处理后(百度盘)](https://pan.baidu.com/s/1qY4kAIg)
+- 勃兰登堡协奏曲第三首第三乐章(降调，比率为0.9) [处理前(百度盘)](https://pan.baidu.com/s/1b3GYcQ) [处理后(百度盘)](https://pan.baidu.com/s/1pL6o4Oz)
+- 德沃夏克Mesicku na nebi hlubokem(降调，比率为0.8) [处理前(百度盘)](https://pan.baidu.com/s/1kVypg4B) [处理后(百度盘)](https://pan.baidu.com/s/1sl8SnoD)
 
 滤波
 ----
